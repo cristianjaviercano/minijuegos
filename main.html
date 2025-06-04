@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simuladores Educativos Interactivos</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .tab-active { 
+            border-bottom-color: #4f46e5; 
+            color: #4f46e5;
+            font-weight: 600;
+        }
+        .tab-inactive {
+            border-bottom-color: transparent;
+            color: #6b7280;
+        }
+        .tab-disabled {
+            color: #d1d5db;
+            cursor: not-allowed;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+            max-height: 400px;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+    <!-- Chosen Palette: Subtle Harmony (Grays, Indigo, with Green/Red accents) -->
+    <!-- Application Structure Plan: A tabbed single-page application (SPA) structure was chosen for maximum clarity and user focus. The navigation bar allows users to switch between distinct simulators (Coin Game, Queuing Theory, Flowshop). This modular approach prevents cognitive overload by presenting one complex topic at a time, making it easier for users to interact and learn within a self-contained environment. The flow is: user selects a tab -> the corresponding simulator is displayed -> user interacts with controls -> visualizations and data update in real-time. This structure is highly scalable and directly addresses the user's need to "interact and see results" for different educational models. -->
+    <!-- Visualization & Content Choices: 
+        1. Coin Toss Game: 
+           - Goal: Demonstrate probability, risk, and commitment.
+           - Viz/Presentation: A simple HTML/CSS/Canvas animation of a flipping coin provides immediate visual feedback. Dynamic text blocks display real-time statistics (tosses, heads, tails, profit/loss).
+           - Interaction: A "Lanzar Moneda" button drives the game step-by-step, reinforcing the "no quitting" rule by being the only active control during the game.
+           - Justification: This direct, manual interaction combined with simple visual feedback makes the abstract concepts of probability and fixed outcomes tangible and easy to understand.
+           - Library/Method: Vanilla JS + HTML Canvas API.
+        2. Queuing Theory (M/M/1):
+           - Goal: Visualize system dynamics (arrivals, service, queue length) and the impact of parameters λ and μ.
+           - Viz/Presentation: A real-time Canvas animation shows "customers" moving through the system. A Chart.js line chart plots queue length over time, offering a quantitative view of system stability. Key Performance Indicators (L, Lq, W, Wq, ρ) are displayed as text and updated dynamically.
+           - Interaction: Sliders for arrival (λ) and service (μ) rates allow users to instantly change parameters and observe the consequences on the animation and chart.
+           - Justification: This dual-visualization approach (qualitative animation + quantitative chart) provides a comprehensive understanding. The interactive sliders empower users to experiment and discover the critical relationship between λ, μ, and system stability.
+           - Library/Method: Vanilla JS + HTML Canvas API + Chart.js.
+        3. Engineering Processes (Flowshop):
+           - Goal: Illustrate the dynamics of a multi-stage production line, focusing on inter-stage queues and processor utilization.
+           - Viz/Presentation: A Canvas animation depicts items flowing from a source through two processors with intermediate queues to a sink. Two Chart.js line charts display real-time queue lengths and processor utilization over time. Textual metrics provide current system status.
+           - Interaction: Sliders control the arrival rate from the source and the service rates of each processor, allowing users to observe the impact on system performance.
+           - Justification: This simulation provides a clear visual and quantitative understanding of bottlenecks, queue formation, and resource utilization in a sequential manufacturing process. Manipulating rates allows for direct experimentation with system design principles.
+           - Library/Method: Vanilla JS + HTML Canvas API + Chart.js.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+
+    <div class="container mx-auto p-4 md:p-8">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-900">Simuladores Educativos Interactivos</h1>
+            <p class="mt-2 text-lg text-gray-600">Explore conceptos de probabilidad e investigación de operaciones.</p>
+        </header>
+
+        <div class="border-b border-gray-200 mb-8">
+            <nav class="-mb-px flex justify-center space-x-4 md:space-x-8" aria-label="Tabs">
+                <button id="tab-btn-coin" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200">
+                    Juego de la Moneda
+                </button>
+                <button id="tab-btn-queue" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200">
+                    Teoría de Colas (M/M/1)
+                </button>
+                <button id="tab-btn-flowshop" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200">
+                    Procesos de Ingeniería (Flowshop)
+                </button>
+            </nav>
+        </div>
+
+        <main>
+            <div id="tab-content-coin" class="hidden">
+                <div class="bg-white rounded-xl shadow-lg p-6 md:p-8 max-w-4xl mx-auto">
+                    <div class="grid md:grid-cols-2 gap-8 items-center">
+                        <div>
+                            <h2 class="text-2xl font-bold text-indigo-600 mb-3">Juego de Azar: La Moneda</h2>
+                            <p class="text-gray-600 mb-4">
+                                Este es un juego de probabilidad para ilustrar el riesgo y el compromiso. Las reglas son simples: se lanza una moneda repetidamente hasta que la diferencia entre el número de caras y sellos sea 3.
+                            </p>
+                            <ul class="list-disc list-inside text-gray-600 space-y-2">
+                                <li>Pagas <strong>$1</strong> por cada lanzamiento.</li>
+                                <li>Recibes <strong>$8</strong> al final del juego.</li>
+                                <li>Ganas dinero si el juego termina en menos de 8 lanzamientos.</li>
+                                <li>Una vez que comienzas, <strong>no puedes abandonar</strong> el juego.</li>
+                            </ul>
+                        </div>
+                        <div class="bg-gray-100 rounded-lg p-6 text-center">
+                            <canvas id="coin-canvas" width="150" height="150" class="mx-auto mb-4 bg-white rounded-full shadow-inner"></canvas>
+                            <div id="coin-stats" class="text-lg mb-4 space-y-1">
+                                <p>Lanzamientos: <span id="toss-count" class="font-semibold">0</span></p>
+                                <p>Caras: <span id="heads-count" class="font-semibold">0</span> | Sellos: <span id="tails-count" class="font-semibold">0</span></p>
+                                <p>Diferencia: <span id="diff-count" class="font-semibold">0</span></p>
+                            </div>
+                            <div id="coin-result" class="h-12 text-xl font-bold flex items-center justify-center"></div>
+                            <button id="start-coin-game" class="w-full bg-indigo-600 text-white font-semibold py-3 px-4 rounded-lg shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-transform transform hover:scale-105">
+                                Empezar Juego
+                            </button>
+                            <button id="toss-coin-btn" class="w-full bg-green-500 text-white font-semibold py-3 px-4 rounded-lg shadow-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-transform transform hover:scale-105 hidden">
+                                Lanzar Moneda
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="tab-content-queue" class="hidden">
+                <div class="bg-white rounded-xl shadow-lg p-6 md:p-8 max-w-5xl mx-auto">
+                    <h2 class="text-2xl font-bold text-indigo-600 mb-3 text-center">Simulador de Teoría de Colas (M/M/1)</h2>
+                    <p class="text-gray-600 mb-6 text-center max-w-3xl mx-auto">
+                        Este simulador modela un sistema de colas M/M/1: llegadas de clientes aleatorias (Poisson), tiempos de servicio aleatorios (Exponencial) y un solo servidor. Ajusta las tasas de llegada (λ) y servicio (μ) para ver cómo afectan la longitud de la cola, los tiempos de espera y la utilización del servidor. El sistema es estable solo si λ < μ.
+                    </p>
+                    <div class="grid md:grid-cols-3 gap-6 mb-6">
+                        <div class="bg-gray-100 p-4 rounded-lg">
+                            <label for="lambda-slider" class="block font-medium text-gray-700">Tasa de Llegada (λ): <span id="lambda-value">1.0</span> clientes/seg</label>
+                            <input id="lambda-slider" type="range" min="0.1" max="5" value="1.0" step="0.1" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                        </div>
+                         <div class="bg-gray-100 p-4 rounded-lg">
+                            <label for="mu-slider" class="block font-medium text-gray-700">Tasa de Servicio (μ): <span id="mu-value">2.0</span> clientes/seg</label>
+                            <input id="mu-slider" type="range" min="0.1" max="5" value="2.0" step="0.1" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                        </div>
+                        <div class="flex items-center justify-center space-x-2">
+                             <button id="queue-start-btn" class="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 transition">Iniciar</button>
+                             <button id="queue-reset-btn" class="px-4 py-2 bg-gray-500 text-white font-semibold rounded-lg shadow-md hover:bg-gray-600 transition">Reiniciar</button>
+                        </div>
+                    </div>
+                     <div class="grid lg:grid-cols-2 gap-6">
+                        <div>
+                             <h3 class="font-semibold text-center mb-2">Visualización de la Cola</h3>
+                             <canvas id="queue-canvas" class="bg-gray-100 rounded-lg w-full" height="200"></canvas>
+                             <div id="stability-warning" class="text-center font-bold mt-2 h-6"></div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4 text-center">
+                            <div class="bg-indigo-50 p-3 rounded-lg"><p class="text-sm text-indigo-800">Utilización (ρ)</p><p id="rho-val" class="text-2xl font-bold">0.00</p></div>
+                            <div class="bg-indigo-50 p-3 rounded-lg"><p class="text-sm text-indigo-800">Clientes en Sistema (L)</p><p id="L-val" class="text-2xl font-bold">0.00</p></div>
+                            <div class="bg-indigo-50 p-3 rounded-lg"><p class="text-sm text-indigo-800">Clientes en Cola (Lq)</p><p id="Lq-val" class="text-2xl font-bold">0.00</p></div>
+                            <div class="bg-indigo-50 p-3 rounded-lg"><p class="text-sm text-indigo-800">Tiempo en Sistema (W)</p><p id="W-val" class="text-2xl font-bold">0.00s</p></div>
+                        </div>
+                    </div>
+                    <div class="mt-8">
+                         <h3 class="font-semibold text-center mb-2">Historial de Longitud de la Cola</h3>
+                         <div class="chart-container">
+                            <canvas id="queue-chart"></canvas>
+                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="tab-content-flowshop" class="hidden">
+                <div class="bg-white rounded-xl shadow-lg p-6 md:p-8 max-w-6xl mx-auto">
+                    <h2 class="text-2xl font-bold text-indigo-600 mb-3 text-center">Simulador de Línea de Manufactura Flowshop</h2>
+                    <p class="text-gray-600 mb-6 text-center max-w-4xl mx-auto">
+                        Este simulador modela una línea de producción Flowshop simple con una fuente de llegada de ítems, dos procesadores en serie y colas intermedias. Ajuste las tasas de operación de cada etapa para observar cómo se forman las colas, la utilización de los procesadores y el rendimiento general del sistema.
+                    </p>
+                    <div class="grid md:grid-cols-3 gap-6 mb-6">
+                        <div class="bg-gray-100 p-4 rounded-lg">
+                            <label for="flowshop-source-rate-slider" class="block font-medium text-gray-700">Tasa de Llegada (Fuente): <span id="flowshop-source-rate-value">1.0</span> items/seg</label>
+                            <input id="flowshop-source-rate-slider" type="range" min="0.1" max="5" value="1.0" step="0.1" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                        </div>
+                        <div class="bg-gray-100 p-4 rounded-lg">
+                            <label for="flowshop-p1-rate-slider" class="block font-medium text-gray-700">Tasa de Servicio (Procesador 1): <span id="flowshop-p1-rate-value">1.0</span> items/seg</label>
+                            <input id="flowshop-p1-rate-slider" type="range" min="0.1" max="5" value="1.0" step="0.1" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                        </div>
+                         <div class="bg-gray-100 p-4 rounded-lg">
+                            <label for="flowshop-p2-rate-slider" class="block font-medium text-gray-700">Tasa de Servicio (Procesador 2): <span id="flowshop-p2-rate-value">1.0</span> items/seg</label>
+                            <input id="flowshop-p2-rate-slider" type="range" min="0.1" max="5" value="1.0" step="0.1" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                        </div>
+                    </div>
+                    <div class="grid lg:grid-cols-2 gap-6">
+                        <div>
+                            <h3 class="font-semibold text-center mb-2">Visualización de la Línea Flowshop</h3>
+                            <canvas id="flowshop-canvas" class="bg-gray-100 rounded-lg w-full" height="150"></canvas>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4 text-center">
+                            <div class="bg-indigo-50 p-3 rounded-lg"><p class="text-sm text-indigo-800">Cola 1 (P1)</p><p id="flowshop-q1-length" class="text-2xl font-bold">0</p></div>
+                            <div class="bg-indigo-50 p-3 rounded-lg"><p class="text-sm text-indigo-800">Cola 2 (P2)</p><p id="flowshop-q2-length" class="text-2xl font-bold">0</p></div>
+                            <div class="bg-indigo-50 p-3 rounded-lg"><p class="text-sm text-indigo-800">Estado P1</p><p id="flowshop-p1-status" class="text-2xl font-bold">Inactivo</p></div>
+                            <div class="bg-indigo-50 p-3 rounded-lg"><p class="text-sm text-indigo-800">Estado P2</p><p id="flowshop-p2-status" class="text-2xl font-bold">Inactivo</p></div>
+                            <div class="bg-indigo-50 p-3 rounded-lg"><p class="text-sm text-indigo-800">Utilización P1</p><p id="flowshop-p1-util" class="text-2xl font-bold">0.00%</p></div>
+                            <div class="bg-indigo-50 p-3 rounded-lg"><p class="text-sm text-indigo-800">Utilización P2</p><p id="flowshop-p2-util" class="text-2xl font-bold">0.00%</p></div>
+                            <div class="bg-indigo-50 p-3 rounded-lg col-span-2"><p class="text-sm text-indigo-800">Rendimiento (Throughput)</p><p id="flowshop-throughput" class="text-2xl font-bold">0</p></div>
+                        </div>
+                    </div>
+                    <div class="flex justify-center space-x-4 mt-6">
+                        <button id="flowshop-start-btn" class="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 transition">Iniciar Simulación</button>
+                        <button id="flowshop-reset-btn" class="px-4 py-2 bg-gray-500 text-white font-semibold rounded-lg shadow-md hover:bg-gray-600 transition">Reiniciar Simulación</button>
+                    </div>
+                    <div class="mt-8 grid md:grid-cols-2 gap-6">
+                         <div>
+                             <h3 class="font-semibold text-center mb-2">Longitud de Colas vs. Tiempo</h3>
+                             <div class="chart-container">
+                                <canvas id="flowshop-queue-chart"></canvas>
+                             </div>
+                         </div>
+                         <div>
+                             <h3 class="font-semibold text-center mb-2">Utilización de Procesadores vs. Tiempo</h3>
+                             <div class="chart-container">
+                                <canvas id="flowshop-util-chart"></canvas>
+                             </div>
+                         </div>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const tabs = {
+                coin: { btn: document.getElementById('tab-btn-coin'), content: document.getElementById('tab-content-coin') },
+                queue: { btn: document.getElementById('tab-btn-queue'), content: document.getElementById('tab-content-queue') },
+                flowshop: { btn: document.getElementById('tab-btn-flowshop'), content: document.getElementById('tab-content-flowshop') }
+            };
+
+            function switchTab(tabKey) {
+                Object.values(tabs).forEach(tab => {
+                    tab.btn.classList.remove('tab-active');
+                    tab.btn.classList.add('tab-inactive');
+                    tab.content.classList.add('hidden');
+                });
+                tabs[tabKey].btn.classList.add('tab-active');
+                tabs[tabKey].content.classList.remove('hidden');
+            }
+            
+            tabs.coin.btn.addEventListener('click', () => switchTab('coin'));
+            tabs.queue.btn.addEventListener('click', () => switchTab('queue'));
+            tabs.flowshop.btn.addEventListener('click', () => switchTab('flowshop'));
+
+            switchTab('coin');
+
+            // --- Coin Game Logic ---
+            const coinCanvas = document.getElementById('coin-canvas');
+            const coinCtx = coinCanvas.getContext('2d');
+            const startCoinGameBtn = document.getElementById('start-coin-game');
+            const tossCoinBtn = document.getElementById('toss-coin-btn');
+            const tossCountEl = document.getElementById('toss-count');
+            const headsCountEl = document.getElementById('heads-count');
+            const tailsCountEl = document.getElementById('tails-count');
+            const diffCountEl = document.getElementById('diff-count');
+            const coinResultEl = document.getElementById('coin-result');
+
+            let tossCount, headsCount, tailsCount, gameInProgress;
+            
+            function drawCoin(face) {
+                coinCtx.clearRect(0, 0, 150, 150);
+                coinCtx.beginPath();
+                coinCtx.arc(75, 75, 70, 0, Math.PI * 2);
+                coinCtx.fillStyle = '#fde047'; // yellow-300
+                coinCtx.fill();
+                coinCtx.strokeStyle = '#facc15'; // yellow-400
+                coinCtx.lineWidth = 5;
+                coinCtx.stroke();
+                coinCtx.fillStyle = '#4b5563'; // gray-600
+                coinCtx.font = 'bold 60px Inter';
+                coinCtx.textAlign = 'center';
+                coinCtx.textBaseline = 'middle';
+                coinCtx.fillText(face, 75, 75);
+            }
+
+            function resetCoinGame() {
+                tossCount = 0;
+                headsCount = 0;
+                tailsCount = 0;
+                gameInProgress = false;
+                updateCoinStats();
+                coinResultEl.textContent = '';
+                coinResultEl.className = 'h-12 text-xl font-bold flex items-center justify-center';
+                startCoinGameBtn.classList.remove('hidden');
+                tossCoinBtn.classList.add('hidden');
+                drawCoin('?');
+            }
+
+            function updateCoinStats() {
+                tossCountEl.textContent = tossCount;
+                headsCountEl.textContent = headsCount;
+                tailsCountEl.textContent = tailsCount;
+                diffCountEl.textContent = Math.abs(headsCount - tailsCount);
+            }
+
+            function tossCoin() {
+                if (!gameInProgress) return;
+                
+                let animationFrame = 0;
+                const animation = setInterval(() => {
+                    drawCoin(animationFrame % 2 === 0 ? 'C' : 'S');
+                    animationFrame++;
+                    if (animationFrame > 10) {
+                        clearInterval(animation);
+                        const isHeads = Math.random() < 0.5;
+                        if (isHeads) {
+                            headsCount++;
+                            drawCoin('C');
+                        } else {
+                            tailsCount++;
+                            drawCoin('S');
+                        }
+                        tossCount++;
+                        updateCoinStats();
+                        checkGameEnd();
+                    }
+                }, 50);
+            }
+            
+            function checkGameEnd() {
+                if (Math.abs(headsCount - tailsCount) === 3) {
+                    gameInProgress = false;
+                    const profit = 8 - tossCount;
+                    if (profit > 0) {
+                        coinResultEl.textContent = `¡Ganaste $${profit}! (${tossCount} lanzamientos)`;
+                        coinResultEl.classList.add('text-green-600');
+                    } else if (profit < 0) {
+                        coinResultEl.textContent = `Perdiste $${Math.abs(profit)} (${tossCount} lanzamientos)`;
+                        coinResultEl.classList.add('text-red-600');
+                    } else {
+                        coinResultEl.textContent = `Empate. (${tossCount} lanzamientos)`;
+                        coinResultEl.classList.add('text-gray-700');
+                    }
+                    startCoinGameBtn.textContent = 'Jugar Otra Vez';
+                    startCoinGameBtn.classList.remove('hidden');
+                    tossCoinBtn.classList.add('hidden');
+                }
+            }
+
+            startCoinGameBtn.addEventListener('click', () => {
+                resetCoinGame();
+                gameInProgress = true;
+                startCoinGameBtn.classList.add('hidden');
+                tossCoinBtn.classList.remove('hidden');
+            });
+            
+            tossCoinBtn.addEventListener('click', tossCoin);
+            
+            resetCoinGame();
+            
+            // --- Queueing Theory Logic ---
+            const lambdaSlider = document.getElementById('lambda-slider');
+            const muSlider = document.getElementById('mu-slider');
+            const lambdaValueEl = document.getElementById('lambda-value');
+            const muValueEl = document.getElementById('mu-value');
+            const queueCanvas = document.getElementById('queue-canvas');
+            const queueCtx = queueCanvas.getContext('2d');
+            const queueStartBtn = document.getElementById('queue-start-btn');
+            const queueResetBtn = document.getElementById('queue-reset-btn');
+            const stabilityWarningEl = document.getElementById('stability-warning');
+            const rhoValEl = document.getElementById('rho-val');
+            const LValEl = document.getElementById('L-val');
+            const LqValEl = document.getElementById('Lq-val');
+            const WValEl = document.getElementById('W-val');
+            const queueChartCanvas = document.getElementById('queue-chart');
+
+            let lambda = parseFloat(lambdaSlider.value);
+            let mu = parseFloat(muSlider.value);
+            let queue = [];
+            let server = null;
+            let time = 0;
+            let nextArrivalTime = 0;
+            let serviceCompletionTime = -1;
+            let simulationInterval;
+            let chartData = [];
+            let timeLabels = [];
+            let queueChart;
+
+            function getExponential(rate) {
+                if (rate <= 0) return Infinity; // Prevent division by zero or non-positive rates
+                return -Math.log(1.0 - Math.random()) / rate;
+            }
+            
+            function initChart() {
+                if (queueChart) queueChart.destroy();
+                chartData = [];
+                timeLabels = [];
+                 const ctx = queueChartCanvas.getContext('2d');
+                 queueChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: timeLabels,
+                        datasets: [{
+                            label: 'Clientes en Cola',
+                            data: chartData,
+                            borderColor: '#4f46e5',
+                            backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: { display: true, text: 'Nº Clientes' }
+                            },
+                            x: {
+                                title: { display: true, text: 'Tiempo (s)' }
+                            }
+                        },
+                        animation: { duration: 250 }
+                    }
+                });
+            }
+
+            function updateMetrics() {
+                if (lambda >= mu) {
+                    stabilityWarningEl.textContent = '¡Sistema Inestable! (λ >= μ)';
+                    stabilityWarningEl.classList.add('text-red-600');
+                    stabilityWarningEl.classList.remove('text-green-600');
+                    rhoValEl.textContent = 'N/A';
+                    LValEl.textContent = '∞';
+                    LqValEl.textContent = '∞';
+                    WValEl.textContent = '∞';
+                } else {
+                    stabilityWarningEl.textContent = 'Sistema Estable';
+                    stabilityWarningEl.classList.add('text-green-600');
+                    stabilityWarningEl.classList.remove('text-red-600');
+                    const rho = lambda / mu;
+                    const L = rho / (1 - rho);
+                    const Lq = (rho*rho) / (1 - rho);
+                    const W = 1 / (mu - lambda);
+                    
+                    rhoValEl.textContent = rho.toFixed(2);
+                    LValEl.textContent = L.toFixed(2);
+                    LqValEl.textContent = Lq.toFixed(2);
+                    WValEl.textContent = W.toFixed(2) + 's';
+                }
+            }
+            
+            function drawQueue() {
+                const width = queueCanvas.width;
+                const height = queueCanvas.height;
+                queueCtx.clearRect(0, 0, width, height);
+
+                const serverX = width * 0.7;
+                const serverY = height / 2;
+                const serverSize = 40;
+                
+                queueCtx.fillStyle = server ? '#10b981' : '#6b7280';
+                queueCtx.fillRect(serverX, serverY - serverSize / 2, serverSize, serverSize);
+                queueCtx.fillStyle = 'white';
+                queueCtx.font = '12px Inter';
+                queueCtx.textAlign = 'center';
+                queueCtx.fillText('Server', serverX + serverSize/2, serverY + 5);
+
+
+                queue.forEach((client, i) => {
+                    const clientX = serverX - 50 - (i * 30);
+                    const clientY = serverY;
+                    queueCtx.beginPath();
+                    queueCtx.arc(clientX, clientY, 12, 0, 2 * Math.PI);
+                    queueCtx.fillStyle = '#3b82f6';
+                    queueCtx.fill();
+                });
+
+                if(server){
+                     const clientX = serverX + serverSize/2;
+                     const clientY = serverY;
+                     queueCtx.beginPath();
+                     queueCtx.arc(clientX, clientY, 12, 0, 2 * Math.PI);
+                     queueCtx.fillStyle = '#2563eb';
+                     queueCtx.fill();
+                }
+            }
+
+            function runSimulationStep() {
+                time += 0.1;
+
+                if (time >= nextArrivalTime) {
+                    queue.push({ arrivalTime: time });
+                    nextArrivalTime = time + getExponential(lambda);
+                }
+
+                if (server && time >= serviceCompletionTime) {
+                    server = null;
+                    serviceCompletionTime = -1;
+                }
+                
+                if (!server && queue.length > 0) {
+                    server = queue.shift();
+                    serviceCompletionTime = time + getExponential(mu);
+                }
+                
+                drawQueue();
+
+                if (Math.floor(time * 10) % 10 === 0) {
+                    timeLabels.push(Math.floor(time));
+                    chartData.push(queue.length);
+                    if (timeLabels.length > 50) {
+                        timeLabels.shift();
+                        chartData.shift();
+                    }
+                    queueChart.update();
+                }
+            }
+            
+            function startSimulation() {
+                if (simulationInterval) return;
+                queueStartBtn.textContent = 'Pausar';
+                queueStartBtn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
+                queueStartBtn.classList.add('bg-yellow-500', 'hover:bg-yellow-600');
+                simulationInterval = setInterval(runSimulationStep, 100);
+            }
+
+            function pauseSimulation() {
+                clearInterval(simulationInterval);
+                simulationInterval = null;
+                queueStartBtn.textContent = 'Continuar';
+                queueStartBtn.classList.remove('bg-yellow-500', 'hover:bg-yellow-600');
+                queueStartBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+            }
+            
+            function resetSimulation() {
+                pauseSimulation();
+                queue = [];
+                server = null;
+                time = 0;
+                nextArrivalTime = getExponential(lambda);
+                serviceCompletionTime = -1;
+                queueStartBtn.textContent = 'Iniciar';
+                updateMetrics();
+                drawQueue();
+                initChart();
+            }
+
+            lambdaSlider.addEventListener('input', (e) => {
+                lambda = parseFloat(e.target.value);
+                lambdaValueEl.textContent = lambda.toFixed(1);
+                updateMetrics();
+            });
+            
+            muSlider.addEventListener('input', (e) => {
+                mu = parseFloat(e.target.value);
+                muValueEl.textContent = mu.toFixed(1);
+                updateMetrics();
+            });
+
+            queueStartBtn.addEventListener('click', () => {
+                if (simulationInterval) {
+                    pauseSimulation();
+                } else {
+                    startSimulation();
+                }
+            });
+
+            queueResetBtn.addEventListener('click', resetSimulation);
+            
+            updateMetrics();
+            initChart();
+            drawQueue();
+
+            // --- Flowshop Simulation Logic ---
+            const flowshopSourceRateSlider = document.getElementById('flowshop-source-rate-slider');
+            const flowshopP1RateSlider = document.getElementById('flowshop-p1-rate-slider');
+            const flowshopP2RateSlider = document.getElementById('flowshop-p2-rate-slider');
+            const flowshopSourceRateValueEl = document.getElementById('flowshop-source-rate-value');
+            const flowshopP1RateValueEl = document.getElementById('flowshop-p1-rate-value');
+            const flowshopP2RateValueEl = document.getElementById('flowshop-p2-rate-value');
+            const flowshopCanvas = document.getElementById('flowshop-canvas');
+            const flowshopCtx = flowshopCanvas.getContext('2d');
+            const flowshopStartBtn = document.getElementById('flowshop-start-btn');
+            const flowshopResetBtn = document.getElementById('flowshop-reset-btn');
+            const flowshopQ1LengthEl = document.getElementById('flowshop-q1-length');
+            const flowshopQ2LengthEl = document.getElementById('flowshop-q2-length');
+            const flowshopP1StatusEl = document.getElementById('flowshop-p1-status');
+            const flowshopP2StatusEl = document.getElementById('flowshop-p2-status');
+            const flowshopThroughputEl = document.getElementById('flowshop-throughput');
+            const flowshopP1UtilEl = document.getElementById('flowshop-p1-util');
+            const flowshopP2UtilEl = document.getElementById('flowshop-p2-util');
+            const flowshopQueueChartCanvas = document.getElementById('flowshop-queue-chart');
+            const flowshopUtilChartCanvas = document.getElementById('flowshop-util-chart');
+
+            let flowshop_source_rate = parseFloat(flowshopSourceRateSlider.value);
+            let flowshop_processor1_rate = parseFloat(flowshopP1RateSlider.value);
+            let flowshop_processor2_rate = parseFloat(flowshopP2RateSlider.value);
+
+            let flowshop_queue1 = [];
+            let flowshop_queue2 = [];
+            let flowshop_processor1_item = null;
+            let flowshop_processor2_item = null;
+
+            let flowshop_time = 0;
+            let flowshop_next_arrival_time = 0;
+            let flowshop_processor1_completion_time = -1;
+            let flowshop_processor2_completion_time = -1;
+
+            let flowshop_throughput_count = 0;
+            let flowshop_processor1_busy_time = 0;
+            let flowshop_processor2_busy_time = 0;
+            let flowshop_simulation_interval;
+
+            let flowshop_chart_queue_labels = [];
+            let flowshop_chart_queue1_data = [];
+            let flowshop_chart_queue2_data = [];
+            let flowshop_chart_util_labels = [];
+            let flowshop_chart_p1_util_data = [];
+            let flowshop_chart_p2_util_data = [];
+            let flowshop_queue_chart;
+            let flowshop_util_chart;
+
+            function initFlowshopCharts() {
+                if (flowshop_queue_chart) flowshop_queue_chart.destroy();
+                if (flowshop_util_chart) flowshop_util_chart.destroy();
+
+                flowshop_chart_queue_labels = [];
+                flowshop_chart_queue1_data = [];
+                flowshop_chart_queue2_data = [];
+                flowshop_chart_util_labels = [];
+                flowshop_chart_p1_util_data = [];
+                flowshop_chart_p2_util_data = [];
+
+                const queueCtx = flowshopQueueChartCanvas.getContext('2d');
+                flowshop_queue_chart = new Chart(queueCtx, {
+                    type: 'line',
+                    data: {
+                        labels: flowshop_chart_queue_labels,
+                        datasets: [
+                            {
+                                label: 'Cola P1',
+                                data: flowshop_chart_queue1_data,
+                                borderColor: '#f59e0b', // amber-500
+                                backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                                borderWidth: 2,
+                                pointRadius: 0,
+                                tension: 0.4
+                            },
+                            {
+                                label: 'Cola P2',
+                                data: flowshop_chart_queue2_data,
+                                borderColor: '#14b8a6', // teal-500
+                                backgroundColor: 'rgba(20, 184, 166, 0.1)',
+                                borderWidth: 2,
+                                pointRadius: 0,
+                                tension: 0.4
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: { beginAtZero: true, title: { display: true, text: 'Nº Items' } },
+                            x: { title: { display: true, text: 'Tiempo (s)' } }
+                        },
+                        animation: { duration: 250 }
+                    }
+                });
+
+                const utilCtx = flowshopUtilChartCanvas.getContext('2d');
+                flowshop_util_chart = new Chart(utilCtx, {
+                    type: 'line',
+                    data: {
+                        labels: flowshop_chart_util_labels,
+                        datasets: [
+                            {
+                                label: 'Utilización P1',
+                                data: flowshop_chart_p1_util_data,
+                                borderColor: '#ef4444', // red-500
+                                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                                borderWidth: 2,
+                                pointRadius: 0,
+                                tension: 0.4
+                            },
+                            {
+                                label: 'Utilización P2',
+                                data: flowshop_chart_p2_util_data,
+                                borderColor: '#3b82f6', // blue-500
+                                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                                borderWidth: 2,
+                                pointRadius: 0,
+                                tension: 0.4
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: { beginAtZero: true, max: 1.0, title: { display: true, text: 'Utilización' } },
+                            x: { title: { display: true, text: 'Tiempo (s)' } }
+                        },
+                        animation: { duration: 250 }
+                    }
+                });
+            }
+
+            function drawFlowshop() {
+                const canvas = flowshopCanvas;
+                const ctx = flowshopCtx;
+                const width = canvas.width;
+                const height = canvas.height;
+                ctx.clearRect(0, 0, width, height);
+
+                const componentWidth = 80;
+                const componentHeight = 60;
+                const spacing = 40; // Reduced spacing for better fit
+                const totalWidth = (5 * componentWidth) + (4 * spacing);
+                const startX = (width - totalWidth) / 2;
+                const startY = height / 2 - componentHeight / 2;
+
+                // Draw Source
+                ctx.fillStyle = '#60a5fa'; // blue-400
+                ctx.fillRect(startX, startY, componentWidth, componentHeight);
+                ctx.fillStyle = 'white';
+                ctx.font = '14px Inter';
+                ctx.textAlign = 'center';
+                ctx.fillText('Fuente', startX + componentWidth / 2, startY + componentHeight / 2 + 5);
+
+                // Draw Processor 1
+                const p1X = startX + componentWidth + spacing;
+                ctx.fillStyle = flowshop_processor1_item ? '#ef4444' : '#fca5a5'; // red-500 / red-300
+                ctx.fillRect(p1X, startY, componentWidth, componentHeight);
+                ctx.fillStyle = 'white';
+                ctx.fillText('P1', p1X + componentWidth / 2, startY + componentHeight / 2 + 5);
+
+                // Draw Queue 1
+                const q1X = p1X + componentWidth + spacing;
+                ctx.fillStyle = '#d1d5db'; // gray-300
+                ctx.fillRect(q1X, startY, componentWidth, componentHeight);
+                ctx.fillStyle = 'black';
+                ctx.fillText('Cola 1', q1X + componentWidth / 2, startY + componentHeight / 2 + 5);
+                flowshop_queue1.forEach((item, i) => {
+                    ctx.beginPath();
+                    ctx.arc(q1X + componentWidth / 2, startY + componentHeight / 2 - 20 + (i * 10), 5, 0, Math.PI * 2);
+                    ctx.fillStyle = '#4b5563'; // gray-600
+                    ctx.fill();
+                });
+
+                // Draw Processor 2
+                const p2X = q1X + componentWidth + spacing;
+                ctx.fillStyle = flowshop_processor2_item ? '#3b82f6' : '#93c5fd'; // blue-500 / blue-300
+                ctx.fillRect(p2X, startY, componentWidth, componentHeight);
+                ctx.fillStyle = 'white';
+                ctx.fillText('P2', p2X + componentWidth / 2, startY + componentHeight / 2 + 5);
+
+                // Draw Queue 2
+                const q2X = p2X + componentWidth + spacing;
+                ctx.fillStyle = '#d1d5db'; // gray-300
+                ctx.fillRect(q2X, startY, componentWidth, componentHeight);
+                ctx.fillStyle = 'black';
+                ctx.fillText('Cola 2', q2X + componentWidth / 2, startY + componentHeight / 2 + 5);
+                flowshop_queue2.forEach((item, i) => {
+                    ctx.beginPath();
+                    ctx.arc(q2X + componentWidth / 2, startY + componentHeight / 2 - 20 + (i * 10), 5, 0, Math.PI * 2);
+                    ctx.fillStyle = '#4b5563'; // gray-600
+                    ctx.fill();
+                });
+
+                // Draw Sink
+                const sinkX = q2X + componentWidth + spacing;
+                ctx.fillStyle = '#60a5fa'; // blue-400
+                ctx.fillRect(sinkX, startY, componentWidth, componentHeight);
+                ctx.fillStyle = 'white';
+                ctx.fillText('Sumidero', sinkX + componentWidth / 2, startY + componentHeight / 2 + 5);
+            }
+
+            function runFlowshopSimulationStep() {
+                const deltaTime = 0.1;
+                flowshop_time += deltaTime;
+
+                // Track busy times for utilization
+                if (flowshop_processor1_item) {
+                    flowshop_processor1_busy_time += deltaTime;
+                }
+                if (flowshop_processor2_item) {
+                    flowshop_processor2_busy_time += deltaTime;
+                }
+
+                // Item arrival from Source
+                if (flowshop_time >= flowshop_next_arrival_time) {
+                    flowshop_queue1.push({}); // Add a new item
+                    flowshop_next_arrival_time = flowshop_time + getExponential(flowshop_source_rate);
+                }
+
+                // Processor 1 Logic
+                if (flowshop_processor1_item && flowshop_time >= flowshop_processor1_completion_time) {
+                    // Item finished P1
+                    if (!flowshop_processor2_item) { // P2 is idle, move directly
+                        flowshop_processor2_item = flowshop_processor1_item;
+                        flowshop_processor2_completion_time = flowshop_time + getExponential(flowshop_processor2_rate);
+                    } else { // P2 is busy, go to Q2
+                        flowshop_queue2.push(flowshop_processor1_item);
+                    }
+                    flowshop_processor1_item = null;
+                }
+
+                if (!flowshop_processor1_item && flowshop_queue1.length > 0) {
+                    flowshop_processor1_item = flowshop_queue1.shift();
+                    flowshop_processor1_completion_time = flowshop_time + getExponential(flowshop_processor1_rate);
+                }
+
+                // Processor 2 Logic
+                if (flowshop_processor2_item && flowshop_time >= flowshop_processor2_completion_time) {
+                    // Item finished P2, goes to Sink
+                    flowshop_throughput_count++;
+                    flowshop_processor2_item = null;
+                }
+
+                if (!flowshop_processor2_item && flowshop_queue2.length > 0) {
+                    flowshop_processor2_item = flowshop_queue2.shift();
+                    flowshop_processor2_completion_time = flowshop_time + getExponential(flowshop_processor2_rate);
+                }
+                
+                drawFlowshop();
+                updateFlowshopMetrics();
+
+                if (Math.floor(flowshop_time * 10) % 10 === 0) { // Update charts every 1 second of simulation time
+                    const currentSimTime = Math.floor(flowshop_time);
+                    if (flowshop_chart_queue_labels.length === 0 || flowshop_chart_queue_labels[flowshop_chart_queue_labels.length - 1] !== currentSimTime) {
+                        flowshop_chart_queue_labels.push(currentSimTime);
+                        flowshop_chart_queue1_data.push(flowshop_queue1.length);
+                        flowshop_chart_queue2_data.push(flowshop_queue2.length);
+                        
+                        flowshop_chart_util_labels.push(currentSimTime);
+                        flowshop_chart_p1_util_data.push(flowshop_time > 0 ? flowshop_processor1_busy_time / flowshop_time : 0);
+                        flowshop_chart_p2_util_data.push(flowshop_time > 0 ? flowshop_processor2_busy_time / flowshop_time : 0);
+                        
+                        // Keep charts from growing too large
+                        const maxChartPoints = 100;
+                        if (flowshop_chart_queue_labels.length > maxChartPoints) {
+                            flowshop_chart_queue_labels.shift();
+                            flowshop_chart_queue1_data.shift();
+                            flowshop_chart_queue2_data.shift();
+                            flowshop_chart_util_labels.shift();
+                            flowshop_chart_p1_util_data.shift();
+                            flowshop_chart_p2_util_data.shift();
+                        }
+                        flowshop_queue_chart.update();
+                        flowshop_util_chart.update();
+                    }
+                }
+            }
+
+            function updateFlowshopMetrics() {
+                flowshopQ1LengthEl.textContent = flowshop_queue1.length;
+                flowshopQ2LengthEl.textContent = flowshop_queue2.length;
+                flowshopP1StatusEl.textContent = flowshop_processor1_item ? 'Ocupado' : 'Inactivo';
+                flowshopP2StatusEl.textContent = flowshop_processor2_item ? 'Ocupado' : 'Inactivo';
+                flowshopThroughputEl.textContent = flowshop_throughput_count;
+                flowshopP1UtilEl.textContent = (flowshop_time > 0 ? (flowshop_processor1_busy_time / flowshop_time * 100).toFixed(2) : 0) + '%';
+                flowshopP2UtilEl.textContent = (flowshop_time > 0 ? (flowshop_processor2_busy_time / flowshop_time * 100).toFixed(2) : 0) + '%';
+            }
+
+            function startFlowshopSimulation() {
+                if (flowshop_simulation_interval) return;
+                flowshopStartBtn.textContent = 'Pausar Simulación';
+                flowshopStartBtn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
+                flowshopStartBtn.classList.add('bg-yellow-500', 'hover:bg-yellow-600');
+                flowshop_simulation_interval = setInterval(runFlowshopSimulationStep, 100);
+            }
+
+            function pauseFlowshopSimulation() {
+                clearInterval(flowshop_simulation_interval);
+                flowshop_simulation_interval = null;
+                flowshopStartBtn.textContent = 'Continuar Simulación';
+                flowshopStartBtn.classList.remove('bg-yellow-500', 'hover:bg-yellow-600');
+                flowshopStartBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+            }
+
+            function resetFlowshopSimulation() {
+                pauseFlowshopSimulation();
+                flowshop_queue1 = [];
+                flowshop_queue2 = [];
+                flowshop_processor1_item = null;
+                flowshop_processor2_item = null;
+                flowshop_time = 0;
+                flowshop_next_arrival_time = 0;
+                flowshop_processor1_completion_time = -1;
+                flowshop_processor2_completion_time = -1;
+                flowshop_throughput_count = 0;
+                flowshop_processor1_busy_time = 0;
+                flowshop_processor2_busy_time = 0;
+                
+                flowshopStartBtn.textContent = 'Iniciar Simulación';
+                updateFlowshopMetrics();
+                drawFlowshop();
+                initFlowshopCharts();
+            }
+
+            flowshopSourceRateSlider.addEventListener('input', (e) => {
+                flowshop_source_rate = parseFloat(e.target.value);
+                flowshopSourceRateValueEl.textContent = flowshop_source_rate.toFixed(1);
+            });
+            
+            flowshopP1RateSlider.addEventListener('input', (e) => {
+                flowshop_processor1_rate = parseFloat(e.target.value);
+                flowshopP1RateValueEl.textContent = flowshop_processor1_rate.toFixed(1);
+            });
+            
+            flowshopP2RateSlider.addEventListener('input', (e) => {
+                flowshop_processor2_rate = parseFloat(e.target.value);
+                flowshopP2RateValueEl.textContent = flowshop_processor2_rate.toFixed(1);
+            });
+
+            flowshopStartBtn.addEventListener('click', () => {
+                if (flowshop_simulation_interval) {
+                    pauseFlowshopSimulation();
+                } else {
+                    startFlowshopSimulation();
+                }
+            });
+
+            flowshopResetBtn.addEventListener('click', resetFlowshopSimulation);
+            
+            resetFlowshopSimulation(); // Initial setup for flowshop
+        });
+    </script>
+</body>
+</html>
